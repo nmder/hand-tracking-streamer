@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: Wengmister
-  productName: hand-tracking-streamer
+  companyName: Declare
+  productName: new-hand-tracking-streamer
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -142,7 +142,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 1.1.0
+  bundleVersion: 0.1
   preloadedAssets:
   - {fileID: 11400000, guid: 59565157b7a818e44b1fc63171a3800b, type: 2}
   - {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
@@ -167,7 +167,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.wengmister.handtrackingstreamer
+    Android: com.declare.handtrackingstreamer
     Standalone: com.ZKWeng.dex-retargeter
     iPhone: com.ZKWeng.dex-retargeter
   buildNumber:
@@ -299,7 +299,7 @@ PlayerSettings:
   - m_BuildTarget: 
     m_Icons:
     - serializedVersion: 2
-      m_Icon: {fileID: 2800000, guid: b4dec1c7a0ac1dd41b892be145337471, type: 3}
+      m_Icon: {fileID: 2800000, guid: 90defe1461338d044b9519828d03fdc3, type: 3}
       m_Width: 128
       m_Height: 128
       m_Kind: 0

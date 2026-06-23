@@ -100,12 +100,17 @@ public class AppManager : MonoBehaviour
 
     private void LoadConfig()
     {
-        // 1. Load Protocol (Default to 2: TCP Wireless if not found)
+        // 1. Load Protocol. Default to TCP Wired/ADB so Wi-Fi is not required.
         if (PlayerPrefs.HasKey("SavedProtocol"))
         {
             int savedProto = PlayerPrefs.GetInt("SavedProtocol");
             // This triggers OnProtocolChanged, which sets default IPs
             protocolDropdown.value = savedProto; 
+        }
+        else if (protocolDropdown != null)
+        {
+            protocolDropdown.value = 1;
+            OnProtocolChanged(1);
         }
 
         // 2. Load IP (Overwrite the default set by the dropdown)
@@ -163,14 +168,14 @@ private void OnProtocolChanged(int index)
         {
             if (ipInputField != null) ipInputField.text = "127.0.0.1";
             if (portInputField != null) portInputField.text = "8000"; 
-            StartCoroutine(QuickTCPCheck());
+            UpdateStatusUI("TCP Wired/ADB Ready", Color.green, true);
         }
         else if (index == 2) // TCP (Wireless) - NEW
         {
             // Set a placeholder or the last known IP. 
             if (ipInputField != null) ipInputField.text = "192.168.1.1"; // Placeholder for the PC's Wi-Fi IP
             if (portInputField != null) portInputField.text = "8000"; 
-            StartCoroutine(QuickTCPCheck());
+            UpdateStatusUI("TCP Wireless Ready", Color.green, true);
         }
     }
 
@@ -182,12 +187,6 @@ private void OnProtocolChanged(int index)
 
     private void ValidateNetwork()
     {
-        if (Application.internetReachability == NetworkReachability.NotReachable)
-        {
-            UpdateStatusUI("Error: No Active Network Connection", Color.red, false);
-            return;
-        }
-
         if (!string.IsNullOrEmpty(_connectionErrorMessage))
         {
             // Uses the persistent color (Red or Yellow) set by the connection logic
@@ -230,6 +229,12 @@ private void OnProtocolChanged(int index)
 
         SelectedProtocol = protocolDropdown.value;
         SelectedHandMode = handDropdown.value;
+
+        if (SelectedProtocol != 1 && Application.internetReachability == NetworkReachability.NotReachable)
+        {
+            UpdateStatusUI("Error: No Active Network Connection", Color.red, true);
+            return;
+        }
 
         // --- UPDATED TCP CHECK BLOCK ---
         if (SelectedProtocol == 1 || SelectedProtocol == 2) // TCP wireless and wired
