@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine.UI;
 using System;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
 
 public class AppManager : MonoBehaviour
 {
@@ -177,6 +178,8 @@ private void OnProtocolChanged(int index)
             if (portInputField != null) portInputField.text = "8000"; 
             UpdateStatusUI("TCP Wireless Ready", Color.green, true);
         }
+
+        ValidateNetwork();
     }
 
     public void ClearError()
@@ -194,7 +197,92 @@ private void OnProtocolChanged(int index)
             return;
         }
 
+        int currentProtocol = protocolDropdown != null ? protocolDropdown.value : SelectedProtocol;
+        if (!HasWifiOrEthernetConnection())
+        {
+            if (currentProtocol == 1) // TCP Wired/ADB does not require Wi-Fi/Ethernet.
+            {
+                UpdateStatusUI("No Wi-Fi/Ethernet detected. TCP Wired/ADB ready.", Color.yellow, true);
+            }
+            else
+            {
+                UpdateStatusUI("No Wi-Fi/Ethernet detected. UDP/Wireless unavailable.", Color.red, false);
+            }
+            return;
+        }
+
         UpdateStatusUI("System Ready", Color.green, true);
+    }
+
+    private bool HasWifiOrEthernetConnection()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+            using (AndroidJavaObject connectivityManager = activity.Call<AndroidJavaObject>("getSystemService", "connectivity"))
+            using (AndroidJavaObject activeNetwork = connectivityManager.Call<AndroidJavaObject>("getActiveNetwork"))
+            {
+                if (activeNetwork == null)
+                {
+                    return false;
+                }
+
+                using (AndroidJavaObject capabilities = connectivityManager.Call<AndroidJavaObject>("getNetworkCapabilities", activeNetwork))
+                {
+                    if (capabilities == null)
+                    {
+                        return false;
+                    }
+
+                    const int TransportWifi = 1;
+                    const int TransportEthernet = 3;
+                    return capabilities.Call<bool>("hasTransport", TransportWifi) ||
+                           capabilities.Call<bool>("hasTransport", TransportEthernet);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[AppManager] Android network check failed: {ex.Message}");
+            return false;
+        }
+#else
+        try
+        {
+            foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (networkInterface.OperationalStatus != OperationalStatus.Up)
+                {
+                    continue;
+                }
+
+                NetworkInterfaceType type = networkInterface.NetworkInterfaceType;
+                if (type != NetworkInterfaceType.Wireless80211 && type != NetworkInterfaceType.Ethernet)
+                {
+                    continue;
+                }
+
+                IPInterfaceProperties properties = networkInterface.GetIPProperties();
+                foreach (UnicastIPAddressInformation address in properties.UnicastAddresses)
+                {
+                    if (address.Address.AddressFamily == AddressFamily.InterNetwork ||
+                        address.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[AppManager] Network interface check failed: {ex.Message}");
+            return false;
+        }
+
+        return false;
+#endif
     }
 
     private void UpdateStatusUI(string message, Color color, bool canStart)
@@ -230,9 +318,9 @@ private void OnProtocolChanged(int index)
         SelectedProtocol = protocolDropdown.value;
         SelectedHandMode = handDropdown.value;
 
-        if (SelectedProtocol != 1 && Application.internetReachability == NetworkReachability.NotReachable)
+        if (SelectedProtocol != 1 && !HasWifiOrEthernetConnection())
         {
-            UpdateStatusUI("Error: No Active Network Connection", Color.red, true);
+            UpdateStatusUI("Error: No Wi-Fi/Ethernet connection. UDP/Wireless requires a local network, not internet.", Color.red, false);
             return;
         }
 
