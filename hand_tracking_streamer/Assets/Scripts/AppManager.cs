@@ -51,6 +51,7 @@ public class AppManager : MonoBehaviour
     public bool isStreaming = false;
     private string _connectionErrorMessage = ""; 
     private Color _statusColor = Color.green; // Persistent color cache
+    private bool _openedWifiSettingsForCurrentNoNetwork = false;
 
     public string ServerIP { get; private set; }
     public int ServerPort { get; private set; }
@@ -159,6 +160,7 @@ public class AppManager : MonoBehaviour
 private void OnProtocolChanged(int index)
     {
         ClearError();
+        _openedWifiSettingsForCurrentNoNetwork = false;
         if (index == 0) // UDP
         {
             if (ipInputField != null) ipInputField.text = "255.255.255.255";
@@ -206,12 +208,41 @@ private void OnProtocolChanged(int index)
             }
             else
             {
-                UpdateStatusUI("No Wi-Fi/Ethernet detected. UDP/Wireless unavailable.", Color.red, false);
+                UpdateStatusUI("No Wi-Fi/Ethernet detected. Opening Wi-Fi settings...", Color.red, false);
+                if (!_openedWifiSettingsForCurrentNoNetwork)
+                {
+                    _openedWifiSettingsForCurrentNoNetwork = true;
+                    OpenWifiSettings();
+                }
             }
             return;
         }
 
+        _openedWifiSettingsForCurrentNoNetwork = false;
         UpdateStatusUI("System Ready", Color.green, true);
+    }
+
+    public void OpenWifiSettings()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            // Android's small Settings Panel intent is ignored on some Quest OS versions,
+            // so open the full Wi-Fi settings page directly.
+            using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+            using (AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", "android.settings.WIFI_SETTINGS"))
+            {
+                activity.Call("startActivity", intent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[AppManager] Failed to open Wi-Fi settings: {ex.Message}");
+        }
+#else
+        Debug.Log("[AppManager] OpenWifiSettings is only available on Android device builds.");
+#endif
     }
 
     private bool HasWifiOrEthernetConnection()

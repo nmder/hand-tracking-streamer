@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System;
-using System.Diagnostics;
 
 public class HandLandmarkStreamer : MonoBehaviour
 {
@@ -43,7 +42,7 @@ public class HandLandmarkStreamer : MonoBehaviour
 
     // Debug timing metadata (per-hand stream)
     private uint _frameId = 0;
-    private static readonly double _ticksToNs = 1_000_000_000.0 / Stopwatch.Frequency;
+    private const long UnixEpochTicks = 621355968000000000L;
     
     // Indices for the 21 standard landmarks (Sending)
     private readonly int[] _streamedJoints = {
@@ -117,14 +116,15 @@ public class HandLandmarkStreamer : MonoBehaviour
         bool addDebugHeaderMeta = AppManager.Instance != null && AppManager.Instance.ShowDebugInfo;
 
         uint frameId = 0;
-        ulong sendTimestampNs = 0;
+        ulong poseCaptureTimestampNs = 0;
 
         if (addDebugHeaderMeta)
         {
             _frameId++;
             frameId = _frameId;
-            // Single timestamp reused for both headers in this packet for deterministic pairing
-            sendTimestampNs = GetMonotonicTimestampNs();
+            // Unix epoch timestamp in nanoseconds, equivalent to Python's time.time_ns().
+            // Captured immediately before hand pose sampling and reused for wrist + landmarks.
+            poseCaptureTimestampNs = GetUnixTimestampNs();
         }
 
         // --- 1. PROCESS WRIST ---
@@ -133,7 +133,7 @@ public class HandLandmarkStreamer : MonoBehaviour
             // Prepare Network Packet
             if (addDebugHeaderMeta)
             {
-                AppendHeaderWithMeta(_sbPacket, "wrist", frameId, sendTimestampNs);
+                AppendHeaderWithMeta(_sbPacket, "wrist", frameId, poseCaptureTimestampNs);
                 _sbPacket.Append(", ");
             }
             else
@@ -161,7 +161,7 @@ public class HandLandmarkStreamer : MonoBehaviour
             _sbPacket.Append("\n");
             if (addDebugHeaderMeta)
             {
-                AppendHeaderWithMeta(_sbPacket, "landmarks", frameId, sendTimestampNs);
+                AppendHeaderWithMeta(_sbPacket, "landmarks", frameId, poseCaptureTimestampNs);
             }
             else
             {
@@ -295,23 +295,23 @@ public class HandLandmarkStreamer : MonoBehaviour
     }
 
     // --- UTILITY HELPERS ---
-    private static ulong GetMonotonicTimestampNs()
+    private static ulong GetUnixTimestampNs()
     {
-        return (ulong)(Stopwatch.GetTimestamp() * _ticksToNs);
+        return (ulong)((DateTime.UtcNow.Ticks - UnixEpochTicks) * 100L);
     }
 
-    private void AppendHeaderWithMeta(StringBuilder sb, string section, uint frameId, ulong sendTimestampNs)
+    private void AppendHeaderWithMeta(StringBuilder sb, string section, uint frameId, ulong poseCaptureTimestampNs)
     {
         // Matches normal message capitalization style ("Left wrist", "Right landmarks")
         // Example:
-        // Left wrist | f = 123 | t = 123456789012345:
+        // Left wrist | f = 123 | t = 1719234567890123400:
         sb.Append(_handSide)
           .Append(" ")
           .Append(section)
           .Append(" | f = ")
           .Append(frameId)
           .Append(" | t = ")
-          .Append(sendTimestampNs)
+          .Append(poseCaptureTimestampNs)
           .Append(":");
     }
 

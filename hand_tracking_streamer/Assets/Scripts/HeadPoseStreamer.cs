@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -27,7 +26,7 @@ public class HeadPoseStreamer : MonoBehaviour
     private readonly StringBuilder _sbLog = new StringBuilder(256);
     private uint _frameId;
 
-    private static readonly double TicksToNs = 1_000_000_000.0 / Stopwatch.Frequency;
+    private const long UnixEpochTicks = 621355968000000000L;
 
     private void Update()
     {
@@ -58,7 +57,12 @@ public class HeadPoseStreamer : MonoBehaviour
         }
         _timer = 0f;
 
-        BuildAndSendPacket(source.position, source.rotation);
+        // Capture timestamp immediately before sampling the pose so `t` represents pose capture time.
+        ulong poseCaptureTimestampNs = GetUnixTimestampNs();
+        Vector3 position = source.position;
+        Quaternion rotation = source.rotation;
+
+        BuildAndSendPacket(position, rotation, poseCaptureTimestampNs);
     }
 
     private void OnDestroy()
@@ -79,7 +83,7 @@ public class HeadPoseStreamer : MonoBehaviour
         return null;
     }
 
-    private void BuildAndSendPacket(Vector3 position, Quaternion rotation)
+    private void BuildAndSendPacket(Vector3 position, Quaternion rotation, ulong poseCaptureTimestampNs)
     {
         _sbPacket.Clear();
         _sbLog.Clear();
@@ -88,7 +92,7 @@ public class HeadPoseStreamer : MonoBehaviour
         if (addDebugHeaderMeta)
         {
             _frameId++;
-            AppendHeaderWithMeta(_sbPacket, "pose", _frameId, GetMonotonicTimestampNs());
+            AppendHeaderWithMeta(_sbPacket, "pose", _frameId, poseCaptureTimestampNs);
             _sbPacket.Append(", ");
         }
         else
@@ -211,16 +215,16 @@ public class HeadPoseStreamer : MonoBehaviour
         _isInitialized = false;
     }
 
-    private static ulong GetMonotonicTimestampNs()
+    private static ulong GetUnixTimestampNs()
     {
-        return (ulong)(Stopwatch.GetTimestamp() * TicksToNs);
+        return (ulong)((DateTime.UtcNow.Ticks - UnixEpochTicks) * 100L);
     }
 
     private static void AppendHeaderWithMeta(
         StringBuilder sb,
         string section,
         uint frameId,
-        ulong sendTimestampNs
+        ulong poseCaptureTimestampNs
     )
     {
         sb.Append("Head ")
@@ -228,7 +232,7 @@ public class HeadPoseStreamer : MonoBehaviour
           .Append(" | f = ")
           .Append(frameId)
           .Append(" | t = ")
-          .Append(sendTimestampNs)
+          .Append(poseCaptureTimestampNs)
           .Append(":");
     }
 
